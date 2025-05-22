@@ -2,9 +2,9 @@
 
 import { usePathname, useSearchParams } from 'next/navigation'
 import { getBaseURL, size } from '@/lib/utils'
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 
-const HyrosTracking = () => {
+const HyrosTrackingInner = () => {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   
@@ -35,6 +35,14 @@ const HyrosTracking = () => {
   }, [pathname, searchParams])
 
   return null
+}
+
+const HyrosTracking = () => {
+  return (
+    <Suspense fallback={null}>
+      <HyrosTrackingInner />
+    </Suspense>
+  )
 }
 
 export default HyrosTracking
