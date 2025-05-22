@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     // Get the API key from environment variables
     const apiKey = process.env.PRIMER_API_KEY;
-    
+
     // Log the API key (partially masked)
     console.log(
       'Using Primer API Key:',
@@ -17,10 +17,7 @@ export async function POST(request: NextRequest) {
 
     if (!apiKey) {
       console.error('Primer API key is not configured in environment variables.');
-      return NextResponse.json(
-        { error: 'Primer API key is not configured' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Primer API key is not configured' }, { status: 500 });
     }
 
     // Generate a unique order ID
@@ -39,16 +36,16 @@ export async function POST(request: NextRequest) {
             name: 'Shipping Fee',
             description: 'Initial shipping fee',
             amount: 499, // $4.99 in cents
-            quantity: 1
-          }
-        ]
+            quantity: 1,
+          },
+        ],
       },
       customer: {
-        emailAddress: request.headers.get('x-customer-email') || 'customer@example.com'
+        emailAddress: request.headers.get('x-customer-email') || 'customer@example.com',
       },
       metadata: {
-        workflow: 'production'
-      }
+        workflow: 'production',
+      },
     };
 
     // Make the request to Primer API
@@ -58,9 +55,9 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'X-Api-Key': apiKey,
-        'X-Api-Version': '2.4' // Added required API version
+        'X-Api-Version': '2.4', // Added required API version
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     // Log the request details (payload logged above)
@@ -69,11 +66,13 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': apiKey ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` : 'Not found',
-        'X-Api-Version': '2.4'
-      }
+        'X-Api-Key': apiKey
+          ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`
+          : 'Not found',
+        'X-Api-Version': '2.4',
+      },
     });
-    
+
     let data;
     try {
       data = await response.json();
@@ -82,13 +81,19 @@ export async function POST(request: NextRequest) {
     } catch (parseError) {
       // If response.json() fails, try to get text for more context
       const textResponse = await response.text();
-      console.error('Failed to parse Primer API response as JSON. Status:', response.status, 'Body:', textResponse, 'Parse Error:', parseError);
+      console.error(
+        'Failed to parse Primer API response as JSON. Status:',
+        response.status,
+        'Body:',
+        textResponse,
+        'Parse Error:',
+        parseError
+      );
       return NextResponse.json(
         { error: 'Failed to parse Primer API response', details: textResponse, parseError },
         { status: response.status || 500 }
       );
     }
-
 
     // Check if the request was successful
     if (!response.ok) {
@@ -112,9 +117,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ clientToken: data.clientToken });
   } catch (error) {
     console.error('Error creating client session:', error);
-    return NextResponse.json(
-      { error: 'An unexpected error occurred' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }
 }

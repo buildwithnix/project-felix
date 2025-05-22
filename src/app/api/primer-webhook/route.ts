@@ -50,7 +50,7 @@ function verifyWebhookSignature(payload: string, signature: string): boolean {
 
   // Remove 'sha256=' prefix if present
   const cleanSignature = signature.replace('sha256=', '');
-  
+
   // Create HMAC hash of the payload
   const expectedSignature = createHmac('sha256', WEBHOOK_SECRET)
     .update(payload, 'utf8')
@@ -89,7 +89,7 @@ async function createSubscription(webhookData: {
   paymentId: string;
 }) {
   const { customerEmail, productIdentifier, paymentMethodToken, paymentId } = webhookData;
-  
+
   try {
     const { data, error } = await supabase
       .from('subscriptions')
@@ -130,7 +130,7 @@ async function processPaymentSuccess(eventData: PrimerWebhookEvent) {
 
   // Extract payment information from the webhook payload
   const payment = eventData.data?.payment || eventData.payment;
-  
+
   if (!payment) {
     throw new Error('Payment data not found in webhook payload');
   }
@@ -139,18 +139,17 @@ async function processPaymentSuccess(eventData: PrimerWebhookEvent) {
   const paymentId = payment.id;
   const orderId = payment.orderId || payment.order_id;
   const paymentMethodToken = payment.paymentMethodToken || payment.payment_method_token;
-  
+
   // Extract customer email (may be in different locations depending on Primer setup)
-  const customerEmail = payment.customer?.email || 
-                       payment.customerEmail || 
-                       payment.billing_address?.email ||
-                       'unknown@example.com'; // Fallback for MVP
+  const customerEmail =
+    payment.customer?.email ||
+    payment.customerEmail ||
+    payment.billing_address?.email ||
+    'unknown@example.com'; // Fallback for MVP
 
   // Extract product identifier from metadata or order
-  const productIdentifier = payment.metadata?.product_id || 
-                           payment.metadata?.productId ||
-                           orderId ||
-                           'default-product'; // Fallback for MVP
+  const productIdentifier =
+    payment.metadata?.product_id || payment.metadata?.productId || orderId || 'default-product'; // Fallback for MVP
 
   // Validate required fields
   if (!paymentMethodToken) {
@@ -181,27 +180,22 @@ export async function POST(request: NextRequest) {
   try {
     // Get raw body for signature verification
     const body = await request.text();
-    
+
     // Get signature from headers
-    const signature = request.headers.get('x-primer-signature') || 
-                     request.headers.get('primer-signature') ||
-                     request.headers.get('signature');
+    const signature =
+      request.headers.get('x-primer-signature') ||
+      request.headers.get('primer-signature') ||
+      request.headers.get('signature');
 
     if (!signature) {
       console.error('No signature found in webhook headers');
-      return NextResponse.json(
-        { error: 'Missing webhook signature' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Missing webhook signature' }, { status: 401 });
     }
 
     // Verify webhook signature
     if (!verifyWebhookSignature(body, signature)) {
       console.error('Invalid webhook signature');
-      return NextResponse.json(
-        { error: 'Invalid webhook signature' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
     }
 
     // Parse the webhook payload
@@ -210,10 +204,7 @@ export async function POST(request: NextRequest) {
       webhookData = JSON.parse(body);
     } catch (error) {
       console.error('Invalid JSON in webhook payload:', error);
-      return NextResponse.json(
-        { error: 'Invalid JSON payload' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
 
     console.log('Received webhook event:', {
@@ -224,32 +215,31 @@ export async function POST(request: NextRequest) {
 
     // Process only PAYMENT.SUCCESS events for MVP
     const eventType = webhookData.type || webhookData.eventType;
-    
+
     if (eventType === 'PAYMENT.SUCCESS') {
       await processPaymentSuccess(webhookData);
-      
+
       console.log('Webhook processed successfully');
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Webhook processed successfully' 
+      return NextResponse.json({
+        success: true,
+        message: 'Webhook processed successfully',
       });
     } else {
       // Log other event types but don't process them
       console.log(`Ignoring webhook event type: ${eventType}`);
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Event type not processed' 
+      return NextResponse.json({
+        success: true,
+        message: 'Event type not processed',
       });
     }
-
   } catch (error) {
     console.error('Error processing webhook:', error);
-    
+
     // Return 500 for processing errors so Primer will retry
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
@@ -260,8 +250,5 @@ export async function POST(request: NextRequest) {
  * GET handler - returns method not allowed
  */
 export async function GET() {
-  return NextResponse.json(
-    { error: 'Method not allowed' },
-    { status: 405 }
-  );
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
 }

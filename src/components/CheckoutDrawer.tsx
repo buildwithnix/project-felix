@@ -8,7 +8,7 @@ import {
   type Payment,
   type PrimerClientError,
   type OnCheckoutFailHandler,
-  type CheckoutStyle // Import CheckoutStyle
+  type CheckoutStyle, // Import CheckoutStyle
 } from '@primer-io/checkout-web';
 
 // Remove custom PrimerStyleOptions as we'll use CheckoutStyle from the SDK
@@ -25,15 +25,29 @@ import {
 interface CheckoutDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onBack?: () => void;
+  onComplete?: () => void;
   initialAmount?: number; // Amount in cents
   productName?: string;
+  contactDetails?: {
+    name: string;
+    email: string;
+    streetAddress: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
 }
 
 export default function CheckoutDrawer({
   isOpen,
   onClose,
+  onBack,
+  onComplete,
   initialAmount = 499, // Default to $4.99
-  productName = 'Shipping Fee'
+  productName = 'Shipping Fee',
+  contactDetails,
 }: CheckoutDrawerProps) {
   const [clientToken, setClientToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -93,28 +107,28 @@ export default function CheckoutDrawer({
     try {
       setIsLoading(true);
       setError(null);
-      
+
       console.log('Fetching client token...');
-      
+
       const response = await fetch('/api/primer-client-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         console.error('Client session error response:', data);
         throw new Error(data.error || data.details?.error?.message || 'Failed to get client token');
       }
-      
+
       if (!data.clientToken) {
         console.error('Missing client token in response:', data);
         throw new Error('Invalid response: Missing client token');
       }
-      
+
       console.log('Client token received successfully');
       setClientToken(data.clientToken);
     } catch (err) {
@@ -148,11 +162,11 @@ export default function CheckoutDrawer({
       console.log('Skipping Primer initialization:', {
         hasClientToken: !!clientToken,
         hasPrimer: !!Primer,
-        isAlreadyInitialized: isInitialized
+        isAlreadyInitialized: isInitialized,
       });
       return;
     }
-    
+
     try {
       // Clean up any existing SDK instance first
       cleanupPrimerSDK();
@@ -161,12 +175,16 @@ export default function CheckoutDrawer({
         setError('Checkout container not found. Cannot initialize payment form.');
         return;
       }
-      console.log('Attempting to initialize Primer with imported SDK. Container element:', containerRef.current);
+      console.log(
+        'Attempting to initialize Primer with imported SDK. Container element:',
+        containerRef.current
+      );
 
       // Use the imported UniversalCheckoutOptions type
       const options: UniversalCheckoutOptions = {
         container: '#checkout-container',
-        style: { // This should conform to CheckoutStyle from the SDK
+        style: {
+          // This should conform to CheckoutStyle from the SDK
           // Example properties based on typical CheckoutStyle structure.
           // Adjust these to actual CheckoutStyle properties if different.
           // For instance, CheckoutStyle might have 'input', 'submitButton', etc.
@@ -177,20 +195,23 @@ export default function CheckoutDrawer({
           // input: { base: { fontFamily: 'system-ui, sans-serif' } },
           // submitButton: { base: { backgroundColor: '#000000', color: '#ffffff' } }
           // For simplicity, keeping the previous structure but it should ideally match CheckoutStyle
-           base: { // This might not be a direct property of CheckoutStyle
-             backgroundColor: '#ffffff',
-             fontFamily: 'system-ui, sans-serif',
-           },
-           buttons: { // This might not be a direct property of CheckoutStyle
-             primary: {
-               backgroundColor: '#000000',
-               color: '#ffffff',
-               hoverBackgroundColor: '#333333',
-             },
-           },
+          base: {
+            // This might not be a direct property of CheckoutStyle
+            backgroundColor: '#ffffff',
+            fontFamily: 'system-ui, sans-serif',
+          },
+          buttons: {
+            // This might not be a direct property of CheckoutStyle
+            primary: {
+              backgroundColor: '#000000',
+              color: '#ffffff',
+              hoverBackgroundColor: '#333333',
+            },
+          },
         } as CheckoutStyle, // Cast to CheckoutStyle to satisfy the type, may need adjustment
         // Ensure callbacks match the expected types from UniversalCheckoutOptions
-        onCheckoutComplete: (data: { payment: Payment | null }) => { // Type based on SDK's PaymentHandlers
+        onCheckoutComplete: (data: { payment: Payment | null }) => {
+          // Type based on SDK's PaymentHandlers
           console.log('Checkout Complete!', data.payment);
           // Accessing a valid property on Payment, e.g., 'id'.
           // If a specific 'paymentMethodToken' is nested within 'paymentMethodData',
@@ -199,9 +220,16 @@ export default function CheckoutDrawer({
             setPaymentMethodToken(data.payment.id); // Using payment.id as an example
             console.log('Payment ID (used as token):', data.payment.id);
           }
-          setTimeout(() => {
-            onClose();
-          }, 1500);
+
+          // Call onComplete if provided (for multi-step flow)
+          if (onComplete) {
+            onComplete();
+          } else {
+            // Fallback to original behavior
+            setTimeout(() => {
+              onClose();
+            }, 1500);
+          }
         },
         onCheckoutFail: (
           error: PrimerClientError, // Use imported PrimerClientError
@@ -224,7 +252,7 @@ export default function CheckoutDrawer({
       console.error('Error initializing Primer SDK:', err);
       setError(err instanceof Error ? err.message : 'Failed to initialize payment form');
     }
-  }, [clientToken, onClose, isInitialized, cleanupPrimerSDK]); // Added dependencies
+  }, [clientToken, onClose, onComplete, isInitialized, cleanupPrimerSDK]); // Added dependencies
 
   // Initialize Primer SDK when client token is available
   useEffect(() => {
@@ -243,7 +271,7 @@ export default function CheckoutDrawer({
     ) {
       console.log('All conditions met (using imported SDK). Calling initializePrimerSDK.');
       initializePrimerSDK();
-    // } else {
+      // } else {
       // if (isOpen && clientToken && !Primer) {
       //   console.warn('Primer SDK module not available. This should not happen if import is correct.');
       // }
@@ -252,7 +280,7 @@ export default function CheckoutDrawer({
       // }
     }
   }, [isOpen, clientToken, initializePrimerSDK, isInitialized]); // Added isInitialized dependency
-  
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -277,7 +305,7 @@ export default function CheckoutDrawer({
         }`}
         onClick={onClose}
       />
-      
+
       {/* Drawer */}
       <div
         className={`relative w-full max-w-md bg-white rounded-t-xl shadow-xl transform transition-transform duration-300 ease-in-out ${
@@ -287,7 +315,33 @@ export default function CheckoutDrawer({
       >
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-white rounded-t-xl">
-          <h2 className="text-lg font-semibold">Checkout</h2>
+          <div className="flex items-center">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="p-2 rounded-full hover:bg-gray-100 mr-2"
+                aria-label="Go back"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+              </button>
+            )}
+            <div>
+              <h2 className="text-lg font-semibold">Payment</h2>
+              {onBack && <p className="text-sm text-gray-600">Step 2 of 2</p>}
+            </div>
+          </div>
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-gray-100"
@@ -309,9 +363,27 @@ export default function CheckoutDrawer({
             </svg>
           </button>
         </div>
-        
+
         {/* Content */}
         <div className="p-4">
+          {/* Contact Details Summary (if in multi-step flow) */}
+          {contactDetails && (
+            <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+              <h3 className="text-md font-medium mb-2">Shipping Information</h3>
+              <div className="text-sm text-gray-700 space-y-1">
+                <p>
+                  <strong>{contactDetails.name}</strong>
+                </p>
+                <p>{contactDetails.email}</p>
+                <p>{contactDetails.streetAddress}</p>
+                <p>
+                  {contactDetails.city}, {contactDetails.state} {contactDetails.zipCode}
+                </p>
+                <p>{contactDetails.country}</p>
+              </div>
+            </div>
+          )}
+
           {/* Order summary */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="text-md font-medium mb-2">Order Summary</h3>
@@ -324,28 +396,24 @@ export default function CheckoutDrawer({
               <span>${(initialAmount / 100).toFixed(2)}</span>
             </div>
           </div>
-          
+
           {/* Loading state */}
           {isLoading && (
             <div className="flex justify-center items-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             </div>
           )}
-          
+
           {/* Error message */}
-          {error && (
-            <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-lg">
-              {error}
-            </div>
-          )}
-          
+          {error && <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-lg">{error}</div>}
+
           {/* Payment method token (for debugging) */}
           {paymentMethodToken && (
             <div className="p-4 mb-4 bg-green-50 text-green-600 rounded-lg">
               Payment successful! Token: {paymentMethodToken.substring(0, 10)}...
             </div>
           )}
-          
+
           {/* Primer SDK container */}
           <div
             id="checkout-container" // Add ID for the string selector
