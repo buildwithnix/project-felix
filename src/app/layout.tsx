@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import HyrosTracking from "@/components/HyrosTracking";
+import HyrosTrackingTest from "@/components/HyrosTrackingTest";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,6 +30,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <HyrosTracking />
+        <HyrosTrackingTest />
         {children}
       </body>
     </html>
