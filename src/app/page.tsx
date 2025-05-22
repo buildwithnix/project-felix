@@ -1,17 +1,96 @@
+'use client';
+
 import Image from "next/image";
+import { useState, useEffect } from "react";
+import CheckoutDrawer from "@/components/CheckoutDrawer";
+
+// Define the type for page data
+interface PageData {
+  title: string;
+  description: string;
+  heroImageURL?: string;
+  initialChargeAmount?: number;
+  recurringChargeAmount?: number;
+  recurringIntervalDays?: number;
+  isDefault: boolean;
+}
 
 export default function Home() {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [pageData, setPageData] = useState<PageData>({
+    title: "Project Felix",
+    description: "A multi-domain Next.js application",
+    isDefault: true
+  });
+
+  // Fetch data on the client side
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const data = await fetch('/api/page-data').then(res => res.json());
+        setPageData(data);
+      } catch (error) {
+        console.error('Error fetching page data:', error);
+      }
+    }
+    fetchData();
+  }, []);
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
+        {/* Display the dynamically fetched product data */}
+        <h1 className="text-3xl font-bold">{pageData.title}</h1>
+        <p className="text-lg mb-4">{pageData.description}</p>
+        
+        {/* Display the product hero image if available */}
+        {pageData.heroImageURL ? (
+          <Image
+            src={pageData.heroImageURL}
+            alt={`${pageData.title} hero image`}
+            width={400}
+            height={300}
+            priority
+            className="rounded-lg shadow-md"
+            unoptimized
+          />
+        ) : (
+          <Image
+            className="dark:invert"
+            src="/next.svg"
+            alt="Next.js logo"
+            width={180}
+            height={38}
+            priority
+            unoptimized
+          />
+        )}
+        
+        {/* Display pricing information if available */}
+        {!pageData.isDefault && (
+          <div className="mt-4 p-4 border border-gray-200 rounded-lg">
+            <h2 className="text-xl font-semibold mb-2">Pricing</h2>
+            <p>Initial charge: ${pageData.initialChargeAmount}</p>
+            <p>Recurring charge: ${pageData.recurringChargeAmount} every {pageData.recurringIntervalDays} days</p>
+            
+            {/* Add checkout button */}
+            <button
+              onClick={() => setIsDrawerOpen(true)}
+              className="mt-4 w-full py-2 px-4 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
+            >
+              Proceed to Checkout
+            </button>
+          </div>
+        )}
+        
+        {/* Add checkout button for default view */}
+        {pageData.isDefault && (
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            className="mt-4 py-2 px-6 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
+          >
+            Try Checkout ($4.99)
+          </button>
+        )}
         <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
           <li className="mb-2 tracking-[-.01em]">
             Get started by editing{" "}
@@ -38,6 +117,7 @@ export default function Home() {
               alt="Vercel logomark"
               width={20}
               height={20}
+              unoptimized
             />
             Deploy now
           </a>
@@ -59,11 +139,12 @@ export default function Home() {
           rel="noopener noreferrer"
         >
           <Image
-            aria-hidden
+            aria-hidden="true"
             src="/file.svg"
             alt="File icon"
             width={16}
             height={16}
+            unoptimized
           />
           Learn
         </a>
@@ -74,11 +155,12 @@ export default function Home() {
           rel="noopener noreferrer"
         >
           <Image
-            aria-hidden
+            aria-hidden="true"
             src="/window.svg"
             alt="Window icon"
             width={16}
             height={16}
+            unoptimized
           />
           Examples
         </a>
@@ -89,15 +171,24 @@ export default function Home() {
           rel="noopener noreferrer"
         >
           <Image
-            aria-hidden
+            aria-hidden="true"
             src="/globe.svg"
             alt="Globe icon"
             width={16}
             height={16}
+            unoptimized
           />
           Go to nextjs.org →
         </a>
       </footer>
+      
+      {/* Checkout Drawer */}
+      <CheckoutDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        initialAmount={499} // $4.99 in cents
+        productName="Shipping Fee"
+      />
     </div>
   );
 }
