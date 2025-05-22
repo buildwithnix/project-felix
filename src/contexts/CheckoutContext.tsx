@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useCallback } from 'react';
 
 // Types for checkout data
 export interface ContactDetails {
@@ -125,37 +125,37 @@ interface CheckoutProviderProps {
 export function CheckoutProvider({ children }: CheckoutProviderProps) {
   const [state, dispatch] = useReducer(checkoutReducer, initialState);
 
-  // Helper functions
-  const setStep = (step: 'contact' | 'payment') => {
+  // Helper functions - memoized to prevent infinite re-renders
+  const setStep = useCallback((step: 'contact' | 'payment') => {
     dispatch({ type: 'SET_STEP', payload: step });
-  };
+  }, []);
 
-  const updateContactDetails = (details: Partial<ContactDetails>) => {
+  const updateContactDetails = useCallback((details: Partial<ContactDetails>) => {
     dispatch({ type: 'UPDATE_CONTACT_DETAILS', payload: details });
-  };
+  }, []);
 
-  const setLoading = (loading: boolean) => {
+  const setLoading = useCallback((loading: boolean) => {
     dispatch({ type: 'SET_LOADING', payload: loading });
-  };
+  }, []);
 
-  const setError = (error: string | null) => {
+  const setError = useCallback((error: string | null) => {
     dispatch({ type: 'SET_ERROR', payload: error });
-  };
+  }, []);
 
-  const setPaymentToken = (token: string) => {
+  const setPaymentToken = useCallback((token: string) => {
     dispatch({ type: 'SET_PAYMENT_TOKEN', payload: token });
-  };
+  }, []);
 
-  const completeCheckout = () => {
+  const completeCheckout = useCallback(() => {
     dispatch({ type: 'COMPLETE_CHECKOUT' });
-  };
+  }, []);
 
-  const resetCheckout = () => {
+  const resetCheckout = useCallback(() => {
     dispatch({ type: 'RESET_CHECKOUT' });
-  };
+  }, []);
 
-  // Validation helpers
-  const isContactDetailsValid = (): boolean => {
+  // Validation helpers - memoized with state dependencies
+  const isContactDetailsValid = useCallback((): boolean => {
     const {
       name,
       email,
@@ -175,11 +175,11 @@ export function CheckoutProvider({ children }: CheckoutProviderProps) {
       zipCode.trim() &&
       country.trim()
     );
-  };
+  }, [state.contactDetails]);
 
-  const canProceedToPayment = (): boolean => {
+  const canProceedToPayment = useCallback((): boolean => {
     return isContactDetailsValid() && !state.isLoading;
-  };
+  }, [isContactDetailsValid, state.isLoading]);
 
   const value: CheckoutContextType = {
     state,

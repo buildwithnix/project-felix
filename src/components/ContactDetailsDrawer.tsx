@@ -46,7 +46,7 @@ export default function ContactDetailsDrawer({
       setFieldErrors({});
       setError(null);
     }
-  }, [isOpen, setError]);
+  }, [isOpen]); // Remove setError from dependencies to prevent infinite loop
 
   // Validation function
   const validateField = (field: string, value: string): string => {

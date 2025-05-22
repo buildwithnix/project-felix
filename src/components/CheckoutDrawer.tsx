@@ -8,7 +8,6 @@ import {
   type Payment,
   type PrimerClientError,
   type OnCheckoutFailHandler,
-  type CheckoutStyle, // Import CheckoutStyle
 } from '@primer-io/checkout-web';
 
 // Remove custom PrimerStyleOptions as we'll use CheckoutStyle from the SDK
@@ -157,9 +156,17 @@ export default function CheckoutDrawer({
 
   // Initialize Primer SDK
   const initializePrimerSDK = useCallback(async () => {
+    console.log('🔧 initializePrimerSDK called with conditions:', {
+      hasClientToken: !!clientToken,
+      hasPrimer: !!Primer,
+      isAlreadyInitialized: isInitialized,
+      containerExists: !!containerRef.current,
+      containerElement: containerRef.current,
+    });
+
     // Primer is now imported directly
     if (!clientToken || !Primer || isInitialized) {
-      console.log('Skipping Primer initialization:', {
+      console.log('❌ Skipping Primer initialization:', {
         hasClientToken: !!clientToken,
         hasPrimer: !!Primer,
         isAlreadyInitialized: isInitialized,
@@ -170,55 +177,28 @@ export default function CheckoutDrawer({
     try {
       // Clean up any existing SDK instance first
       cleanupPrimerSDK();
+
+      // Wait a bit for DOM to be ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       if (!containerRef.current) {
-        console.error('Primer container element not found!');
+        console.error('❌ Primer container element not found after waiting!');
         setError('Checkout container not found. Cannot initialize payment form.');
         return;
       }
-      console.log(
-        'Attempting to initialize Primer with imported SDK. Container element:',
-        containerRef.current
-      );
 
-      // Use the imported UniversalCheckoutOptions type
+      console.log('✅ Container found, proceeding with Primer initialization');
+      console.log('📦 Container element:', containerRef.current);
+      console.log('🔑 Client token (first 20 chars):', clientToken.substring(0, 20) + '...');
+
+      // Enhanced options with better error handling
       const options: UniversalCheckoutOptions = {
         container: '#checkout-container',
-        style: {
-          // This should conform to CheckoutStyle from the SDK
-          // Example properties based on typical CheckoutStyle structure.
-          // Adjust these to actual CheckoutStyle properties if different.
-          // For instance, CheckoutStyle might have 'input', 'submitButton', etc.
-          // For now, let's assume a simplified structure or that the SDK handles partial styles.
-          // If specific style properties are needed, they should be added according to CheckoutStyle.
-          // This is a placeholder to show where styles would go.
-          // A more complete style object might look like:
-          // input: { base: { fontFamily: 'system-ui, sans-serif' } },
-          // submitButton: { base: { backgroundColor: '#000000', color: '#ffffff' } }
-          // For simplicity, keeping the previous structure but it should ideally match CheckoutStyle
-          base: {
-            // This might not be a direct property of CheckoutStyle
-            backgroundColor: '#ffffff',
-            fontFamily: 'system-ui, sans-serif',
-          },
-          buttons: {
-            // This might not be a direct property of CheckoutStyle
-            primary: {
-              backgroundColor: '#000000',
-              color: '#ffffff',
-              hoverBackgroundColor: '#333333',
-            },
-          },
-        } as CheckoutStyle, // Cast to CheckoutStyle to satisfy the type, may need adjustment
-        // Ensure callbacks match the expected types from UniversalCheckoutOptions
         onCheckoutComplete: (data: { payment: Payment | null }) => {
-          // Type based on SDK's PaymentHandlers
-          console.log('Checkout Complete!', data.payment);
-          // Accessing a valid property on Payment, e.g., 'id'.
-          // If a specific 'paymentMethodToken' is nested within 'paymentMethodData',
-          // that would require further inspection of 'PaymentMethodData$1' type.
+          console.log('✅ Checkout Complete!', data.payment);
           if (data.payment?.id) {
-            setPaymentMethodToken(data.payment.id); // Using payment.id as an example
-            console.log('Payment ID (used as token):', data.payment.id);
+            setPaymentMethodToken(data.payment.id);
+            console.log('💳 Payment ID (used as token):', data.payment.id);
           }
 
           // Call onComplete if provided (for multi-step flow)
@@ -232,36 +212,81 @@ export default function CheckoutDrawer({
           }
         },
         onCheckoutFail: (
-          error: PrimerClientError, // Use imported PrimerClientError
-          data: { payment?: Payment }, // Use imported Payment
-          handler: OnCheckoutFailHandler | undefined // Use imported OnCheckoutFailHandler
+          error: PrimerClientError,
+          data: { payment?: Payment },
+          handler: OnCheckoutFailHandler | undefined
         ) => {
-          console.log('Checkout Fail!', error, data.payment);
+          console.error('❌ Checkout Fail!', error, data.payment);
           setError(`Payment failed: ${error.message}. Please try again.`);
           if (handler) {
             handler.showErrorMessage();
           }
         },
-        // Removed onTokenizeSuccess and onTokenizeFail as they are part of TokenizationHandlers
-        // which is a separate concern from the basic onCheckoutComplete/Fail in UniversalCheckoutOptions
-        // If tokenization specific events are needed, they should be added according to SDK's TokenizationHandlers type
       };
-      await Primer.showUniversalCheckout(clientToken, options);
-      setIsInitialized(true); // Mark as initialized
+
+      console.log('🚀 Calling Primer.showUniversalCheckout with options:', options);
+      console.log('🔑 Using client token:', clientToken.substring(0, 50) + '...');
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(
+          () => reject(new Error('Primer SDK initialization timeout after 30 seconds')),
+          30000
+        );
+      });
+
+      try {
+        await Promise.race([Primer.showUniversalCheckout(clientToken, options), timeoutPromise]);
+        console.log('✅ Primer SDK initialized successfully');
+        setIsInitialized(true); // Mark as initialized
+      } catch (networkError) {
+        // Handle specific network connectivity issues
+        console.error('🌐 Network error during Primer initialization:', networkError);
+        if (networkError instanceof Error) {
+          if (
+            networkError.message.includes('NetworkError') ||
+            networkError.message.includes('Failed to fetch')
+          ) {
+            setError(
+              'Unable to connect to payment services. Please check your internet connection and try again.'
+            );
+          } else if (networkError.message.includes('timeout')) {
+            setError('Payment service is taking too long to respond. Please try again.');
+          } else if (
+            networkError.message.includes('Failed after') &&
+            networkError.message.includes('retries')
+          ) {
+            setError(
+              'Payment service is currently unavailable. Please try again in a few moments.'
+            );
+          } else {
+            throw networkError; // Re-throw if it's not a network issue
+          }
+        } else {
+          throw networkError;
+        }
+      }
     } catch (err) {
-      console.error('Error initializing Primer SDK:', err);
+      console.error('❌ Error initializing Primer SDK:', err);
+      console.error('❌ Error details:', {
+        name: err instanceof Error ? err.name : 'Unknown',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       setError(err instanceof Error ? err.message : 'Failed to initialize payment form');
     }
   }, [clientToken, onClose, onComplete, isInitialized, cleanupPrimerSDK]); // Added dependencies
 
   // Initialize Primer SDK when client token is available
   useEffect(() => {
-    // console.log('Checking conditions to initialize Primer SDK:', {
-    //   isOpen,
-    //   clientToken: !!clientToken,
-    //   containerExists: !!containerRef.current,
-    //   PrimerAvailable: !!Primer,
-    // });
+    console.log('🔍 Checking conditions to initialize Primer SDK:', {
+      isOpen,
+      hasClientToken: !!clientToken,
+      containerExists: !!containerRef.current,
+      PrimerAvailable: !!Primer,
+      isInitialized,
+      containerElement: containerRef.current,
+    });
 
     if (
       isOpen &&
@@ -269,15 +294,23 @@ export default function CheckoutDrawer({
       Primer && // Check if Primer module is available
       containerRef.current // Ensure container is rendered
     ) {
-      console.log('All conditions met (using imported SDK). Calling initializePrimerSDK.');
+      console.log('✅ All conditions met (using imported SDK). Calling initializePrimerSDK.');
       initializePrimerSDK();
-      // } else {
-      // if (isOpen && clientToken && !Primer) {
-      //   console.warn('Primer SDK module not available. This should not happen if import is correct.');
-      // }
-      // if (isOpen && clientToken && Primer && !containerRef.current) {
-      //   console.warn('Primer containerRef.current is not yet available. Waiting...');
-      // }
+    } else {
+      if (isOpen && clientToken && !Primer) {
+        console.warn(
+          '⚠️ Primer SDK module not available. This should not happen if import is correct.'
+        );
+      }
+      if (isOpen && clientToken && Primer && !containerRef.current) {
+        console.warn('⚠️ Primer containerRef.current is not yet available. Waiting...');
+      }
+      if (isOpen && !clientToken) {
+        console.log('⏳ Waiting for client token...');
+      }
+      if (!isOpen) {
+        console.log('🚪 Drawer is closed, skipping initialization');
+      }
     }
   }, [isOpen, clientToken, initializePrimerSDK, isInitialized]); // Added isInitialized dependency
 
